@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PIL import Image
 
-def load_raw_image(file_path, h=1344, w=1344):
+def load_raw_image(file_path, h=460, w=100):
     """
     .rawファイルを読み込み、指定されたサイズにリシェイプする関数。
     
@@ -52,7 +52,7 @@ def random_augmentation(image):
     return image
 
 # 画像のデータ拡張を行う関数
-def augment_raw_images(input_dir, n, output_dir, h=1344, w=1344):
+def augment_raw_images(input_dir, n, output_dir, h=460, w=100):
     # 入力フォルダ内のすべてのrawファイルを取得
     input_images = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.raw')]
     os.makedirs(output_dir, exist_ok=True)
