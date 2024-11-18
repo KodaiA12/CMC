@@ -203,7 +203,8 @@ def multi_raw2png(file_dir, save_dir, w, h):
 
 if __name__ == "__main__":
     # 1ex
-    multi_crop_raw("test/data/first/first_data", "test/data/first/1ex_cropped", t_left=(400, 550), b_right=(860, 650))
+    # multi_crop_raw("test/data/first/first_data", "test/data/first/1ex_cropped", t_left=(400, 550), b_right=(860, 650))
+    multi_crop_raw("dataset/test", "dataset/test2", t_left=(400, 550), b_right=(860, 650))
     # multi_raw2png("1ex_cropped", "1ex_png", 574, 130)
 
     # 3ex

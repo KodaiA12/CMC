@@ -1,77 +1,103 @@
 import random
 import os
+import shutil
 import numpy as np
-from PIL import Image
+import cv2
 
-def load_raw_image(file_path, h=460, w=100):
-    """
-    .rawファイルを読み込み、指定されたサイズにリシェイプする関数。
-    
-    Parameters:
-    - file_path (str): rawファイルのパス
-    - h (int): 画像の高さ
-    - w (int): 画像の幅
-    
-    Returns:
-    - data (numpy array): 画像データ
-    """
+# RAW画像を読み込む関数
+def load_raw_image(file_path, h, w):
     with open(file_path, "rb") as f:
         rawdata = f.read()
         data = np.frombuffer(rawdata, dtype=np.int16).reshape(h, w)
     return data
 
+# RAW画像を保存する関数
 def save_raw_image(data, file_path):
-    """
-    numpy配列を.raw形式で保存する関数。
-    
-    Parameters:
-    - data (numpy array): 保存する画像データ
-    - file_path (str): 保存先のファイルパス
-    """
-    data.tofile(file_path)
+    with open(file_path, "wb") as f:
+        f.write(data.tobytes())
 
 # ランダムなデータ拡張を行う関数
-def random_augmentation(image):
-    # ランダムに左右反転
-    if random.random() > 0.5:
-        image = np.fliplr(image)
-    
-    # ランダムに上下反転
-    if random.random() > 0.5:
-        image = np.flipud(image)
-    
-    # ランダムに拡大・縮小（90%～110%）
-    scale = random.uniform(0.9, 1.1)
-    h, w = image.shape
-    new_size = (int(w * scale), int(h * scale))
-    image = np.array(Image.fromarray(image).resize(new_size, Image.ANTIALIAS))
-    
-    # 画像サイズを元のサイズにリサイズ
-    image = np.array(Image.fromarray(image).resize((w, h), Image.ANTIALIAS))
-    
-    return image
+def random_augmentation(image, label, h, w):
+    augmented = False
+    while not augmented:
+        # 左右反転
+        if random.random() > 0.5:
+            image = np.fliplr(image)
+            label = np.fliplr(label)
+            print("左右反転を適用")
+            augmented = True
+        
+        # 上下反転
+        if random.random() > 0.5:
+            image = np.flipud(image)
+            label = np.flipud(label)
+            print("上下反転を適用")
+            augmented = True
+        
+        # 拡大・縮小
+        if random.random() > 0.5:
+            scale = random.uniform(0.5, 2.0)
+            new_size = (int(w * scale), int(h * scale))
+            image = cv2.resize(image, new_size, interpolation=cv2.INTER_NEAREST)
+            label = cv2.resize(label, new_size, interpolation=cv2.INTER_NEAREST)
+            print(f"拡大・縮小を適用（スケール: {scale:.2f}）")
+            image = cv2.resize(image, (w, h), interpolation=cv2.INTER_NEAREST)
+            label = cv2.resize(label, (w, h), interpolation=cv2.INTER_NEAREST)
+            augmented = True
 
-# 画像のデータ拡張を行う関数
-def augment_raw_images(input_dir, n, output_dir, h=460, w=100):
-    # 入力フォルダ内のすべてのrawファイルを取得
-    input_images = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith('.raw')]
-    os.makedirs(output_dir, exist_ok=True)
-    
-    for i in range(n):
-        # フォルダ内からランダムに画像を選択
-        img_path = random.choice(input_images)
+    return image, label
+
+# 画像とラベルのデータ拡張を行う関数
+def augment_images_and_labels(image_dir, label_dir, n, output_image_dir, output_label_dir, h, w):
+    # 出力ディレクトリを初期化
+    if os.path.exists(output_image_dir):
+        shutil.rmtree(output_image_dir)
+    if os.path.exists(output_label_dir):
+        shutil.rmtree(output_label_dir)
+    os.makedirs(output_image_dir, exist_ok=True)
+    os.makedirs(output_label_dir, exist_ok=True)
+
+    # 入力フォルダ内の画像とラベルを取得
+    images = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.endswith('.raw')])
+    labels = sorted([os.path.join(label_dir, f) for f in os.listdir(label_dir) if f.endswith('.png')])
+
+    for img_path, label_path in zip(images, labels):
+        img_name = os.path.splitext(os.path.basename(img_path))[0]  # 拡張子を除去
+        label_name = os.path.splitext(os.path.basename(label_path))[0]  # 拡張子を除去
+
+        # 元画像とラベルを読み込む
         img = load_raw_image(img_path, h, w)
-        
-        # ランダムなデータ拡張を適用
-        augmented_img = random_augmentation(img)
-        
-        # 画像を保存
-        output_path = os.path.join(output_dir, f"augmented_image_{i+1}.raw")
-        save_raw_image(augmented_img, output_path)
+        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
 
-# コード実行
-input_dir = "input_images_folder"  # 入力raw画像フォルダのパス
-n = 10  # 生成する画像の枚数
-output_dir = "augmented_images"  # 出力先フォルダ
+        for i in range(n):
+            # データ拡張を適用
+            augmented_img, augmented_label = random_augmentation(img.copy(), label.copy(), h, w)
 
-augment_raw_images(input_dir, n, output_dir)
+            # 加工後の画像とラベルの名前を生成
+            img_output_name = f"{i+1}_{img_name}_augmented.raw"
+            label_output_name = f"{i+1}_{label_name}_augmented.png"
+
+            # 加工後の画像とラベルを保存
+            img_output_path = os.path.join(output_image_dir, img_output_name)
+            label_output_path = os.path.join(output_label_dir, label_output_name)
+
+            save_raw_image(augmented_img, img_output_path)
+            cv2.imwrite(label_output_path, augmented_label)
+
+# trainとvalidationに対して処理を実行する関数
+def augment_train_and_validation(base_dir, n, h, w):
+    for subset in ["train", "validation"]:
+        image_dir = os.path.join(base_dir, "image", subset)
+        label_dir = os.path.join(base_dir, "label", subset)
+        output_image_dir = os.path.join(base_dir, "augmented_images", subset)
+        output_label_dir = os.path.join(base_dir, "augmented_labels", subset)
+
+        augment_images_and_labels(image_dir, label_dir, n, output_image_dir, output_label_dir, h, w)
+
+# 実行
+base_dir = "data/first"  # ベースディレクトリ
+n = 5  # 各画像ごとに生成する加工画像の枚数
+h, w = 50, 50  # 元画像およびラベルの高さと幅
+
+augment_train_and_validation(base_dir, n, h, w)
+
