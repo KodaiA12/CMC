@@ -209,5 +209,5 @@ cropped_area_size(
     input_dir="data/first/1ex_cropped",       # 元画像のディレクトリ
     input_GT_dir="data/first/first_label",   # ラベル画像のディレクトリ
     save_path="data/first",                  # 保存先のベースディレクトリ
-    grid_size=50                             # クロップサイズ
+    grid_size=32                             # クロップサイズ
 )

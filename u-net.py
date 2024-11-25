@@ -3,6 +3,9 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
+from torch.utils.data import Dataset
+from torchvision import transforms
+from torchvision.transforms import ToTensor, Resize
 import numpy as np
 from PIL import Image
 import csv
@@ -11,11 +14,64 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 
+def load_raw_image(file_path, h, w):
+    """
+    .raw画像をnumpy配列として読み込む関数。
+    
+    Parameters:
+    - file_path (str): rawファイルのパス
+    - h (int): 画像の高さ
+    - w (int): 画像の幅
+    
+    Returns:
+    - data (numpy array): 画像データ
+    """
+    with open(file_path, "rb") as f:
+        raw_data = f.read()
+        image = np.frombuffer(raw_data, dtype=np.int16).reshape(h, w)
+    return image
+class CrackDatasetRaw(Dataset):
+    def __init__(self, image_dir, mask_dir, transform=None):
+        """
+        RAW画像とマスク画像を扱うデータセットクラス。
+        
+        Parameters:
+        - image_dir (str): RAW画像ディレクトリ
+        - mask_dir (str): マスク画像ディレクトリ
+        - transform (callable, optional): 画像とマスクへの変換
+        """
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.image_files = sorted(os.listdir(image_dir))
+        self.mask_files = sorted(os.listdir(mask_dir))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        # RAW画像の読み込みと正規化
+        img_path = os.path.join(self.image_dir, self.image_files[idx])
+        with open(img_path, "rb") as f:
+            raw_data = f.read()
+            raw_image = np.frombuffer(raw_data, dtype=np.int16).reshape(32, 32)
+            raw_image = (raw_image.astype("float32") - raw_image.min()) / (raw_image.max() - raw_image.min())
+            raw_image = torch.from_numpy(raw_image).unsqueeze(0)  # [1, H, W]
+
+        # マスク画像の読み込みと変換
+        mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+        mask = Image.open(mask_path).convert("L")
+        mask = np.array(mask)
+        mask = torch.from_numpy(mask).unsqueeze(0).float()  # floatに変換
+
+        return raw_image, mask
+
+
 # モデルの作成
 model = smp.UnetPlusPlus(
     encoder_name="resnet34",
     encoder_weights="imagenet",
-    in_channels=3,
+    in_channels=1,
     classes=1,
     activation='sigmoid'
 )
@@ -43,14 +99,24 @@ criterion = FocalLoss()
 # オプティマイザの設定
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-# データローダの設定
-train_dataset = "dataset/train"  # トレーニングデータセットを定義
-eval_dataset = "dataset/validation"  # 評価データセットを定義
+# トレーニングデータセット
+train_dataset = CrackDatasetRaw(
+    image_dir="dataset/train/images",  # RAW画像のディレクトリ
+    mask_dir="dataset/train/masks",    # マスク画像のディレクトリ
+)
+
+# 検証データセット
+eval_dataset = CrackDatasetRaw(
+    image_dir="dataset/validation/images",
+    mask_dir="dataset/validation/masks",
+)
+
+# データローダ
 train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
 eval_loader = DataLoader(eval_dataset, batch_size=10, shuffle=False)
 
 # 学習設定
-num_epochs = 500
+num_epochs = 3
 
 # 保存ディレクトリとファイル名設定
 date_str = datetime.now().strftime('%Y-%m-%d')
@@ -74,7 +140,10 @@ for epoch in range(num_epochs):
 
     # トレーニング
     for images, masks in train_loader:
-        images, masks = images.to(device), masks.to(device)
+        print(f"Image Min: {images.min()}, Max: {images.max()}")
+        print(f"Mask Min: {masks.min()}, Max: {masks.max()}")
+        images = images.to(device)
+        masks = masks.to(device).float()  # 明示的にfloatに変換
 
         optimizer.zero_grad()
         outputs = model(images)
@@ -155,111 +224,79 @@ plt.show()
 
 print(f"グラフを '{graph_path}' に保存しました")
 
-def load_raw_image(file_path, h, w):
-    """
-    .raw画像をnumpy配列として読み込む関数。
-    
-    Parameters:
-    - file_path (str): rawファイルのパス
-    - h (int): 画像の高さ
-    - w (int): 画像の幅
-    
-    Returns:
-    - data (numpy array): 画像データ
-    """
-    with open(file_path, "rb") as f:
-        raw_data = f.read()
-        image = np.frombuffer(raw_data, dtype=np.int16).reshape(h, w)
-    return image
 
-def split_into_patches(image, patch_size=(50, 50)):
+
+def split_and_merge_with_inference(image, model, device, grid_size=32):
     """
-    画像を指定されたサイズのパッチに分割する関数。
+    大きな画像を指定されたグリッドサイズで分割し、モデルで推論し、再結合する関数。
 
     Parameters:
-    - image (numpy array): 元画像
-    - patch_size (tuple): 分割するパッチのサイズ (高さ, 幅)
-
-    Returns:
-    - patches (list): パッチのリスト
-    - positions (list): パッチの開始位置 (x, y) のリスト
-    """
-    h, w = image.shape
-    ph, pw = patch_size
-    patches, positions = [], []
-
-    for y in range(0, h, ph):
-        for x in range(0, w, pw):
-            patch = image[y:y + ph, x:x + pw]
-            patches.append(patch)
-            positions.append((x, y))
-    return patches, positions
-
-def merge_patches(patches, positions, output_shape):
-    """
-    分割されたパッチを元の画像サイズに結合する関数。
-
-    Parameters:
-    - patches (list): パッチのリスト
-    - positions (list): パッチの開始位置 (x, y) のリスト
-    - output_shape (tuple): 元の画像サイズ (高さ, 幅)
-
-    Returns:
-    - merged_image (numpy array): 再構成された画像
-    """
-    h, w = output_shape
-    merged_image = np.zeros((h, w), dtype=np.uint8)
-    for patch, (x, y) in zip(patches, positions):
-        ph, pw = patch.shape
-        merged_image[y:y + ph, x:x + pw] = patch
-    return merged_image
-
-def predict_large_image(image_path, model, device, output_path="predicted_mask.png", original_size=(460, 100), patch_size=(50, 50)):
-    """
-    大きな画像をパッチごとに予測し、結果を再構成する関数。
-
-    Parameters:
-    - image_path (str): 予測対象のraw画像ファイルパス
+    - image (numpy array): 推論対象のRAW画像データ
     - model (torch.nn.Module): 学習済みモデル
     - device (torch.device): 使用するデバイス（CPUまたはGPU）
-    - output_path (str): 予測結果の保存先
-    - original_size (tuple): 入力画像の元サイズ (高さ, 幅)
-    - patch_size (tuple): モデルに入力するパッチのサイズ (高さ, 幅)
+    - grid_size (int): 分割するグリッドのサイズ (デフォルト: 32)
+
+    Returns:
+    - reconstructed_image (numpy array): モデルの推論結果を再結合した画像
     """
-    model.eval()
+    model.eval()  # 推論モードに設定
 
-    # raw画像を読み込み
-    h, w = original_size
-    raw_image = load_raw_image(image_path, h, w)
+    # 元画像のサイズ
+    h, w = image.shape
 
-    # 画像をパッチに分割
-    patches, positions = split_into_patches(raw_image, patch_size)
+    # 余りを計算し、画像をパディング
+    y_surp, x_surp = h % grid_size, w % grid_size
+    padded_image = np.pad(
+        image, ((0, grid_size - y_surp), (0, grid_size - x_surp)), "constant"
+    )
 
-    # 各パッチを予測
+    # パッチごとに推論し、結果を保存するリスト
     predicted_patches = []
-    for patch in patches:
-        # パッチをリサイズして正規化
-        resized_patch = cv2.resize(patch, (50, 50), interpolation=cv2.INTER_LINEAR)
-        normalized_patch = (resized_patch.astype('float32') - resized_patch.min()) / (resized_patch.max() - resized_patch.min())
-        input_patch = torch.from_numpy(normalized_patch).unsqueeze(0).unsqueeze(0).to(device)  # [B, C, H, W]
 
-        # 推論
-        with torch.no_grad():
-            output = model(input_patch)
-            prediction = output.squeeze().cpu().numpy()
-            predicted_patches.append((prediction > 0.5).astype(np.uint8) * 255)
+    # パッチの切り取りと推論
+    ph, pw = padded_image.shape
+    for i in range(0, ph, grid_size):
+        for j in range(0, pw, grid_size):
+            # パッチの切り取り
+            patch = padded_image[i : i + grid_size, j : j + grid_size]
 
-    # パッチを結合して元のサイズに戻す
-    predicted_mask = merge_patches(predicted_patches, positions, output_shape=(h, w))
+            # パッチの前処理
+            normalized_patch = (patch.astype('float32') - patch.min()) / (patch.max() - patch.min())
+            input_patch = torch.from_numpy(normalized_patch).unsqueeze(0).unsqueeze(0).to(device)  # [B, C, H, W]
 
-    # PNG形式で保存
-    result_image = Image.fromarray(predicted_mask)
-    result_image.save(output_path)
-    print(f"予測結果を{output_path}に保存しました")
+            # モデルで推論
+            with torch.no_grad():
+                output = model(input_patch)
+                prediction = output.squeeze().cpu().numpy()
 
-# 学習済みモデルを読み込み
-model.load_state_dict(torch.load("crack_detection_model.pth", map_location=device))
+            # 推論結果を二値化して保存
+            predicted_patch = (prediction > 0.5).astype(np.uint8) * 255
+            predicted_patches.append(predicted_patch)
 
-# 推論の実行例
-test_image_path = "./hyouka/2400_1_SC.raw"  # 予測対象のraw画像パス
-predict_large_image(test_image_path, model, device, output_path="predicted_mask.png", original_size=(460, 100), patch_size=(50, 50))
+    # 推論結果を再結合
+    reconstructed_image = np.zeros_like(padded_image, dtype=np.uint8)
+    idx = 0
+    for i in range(0, ph, grid_size):
+        for j in range(0, pw, grid_size):
+            reconstructed_image[i : i + grid_size, j : j + grid_size] = predicted_patches[idx]
+            idx += 1
+
+    # パディングを取り除いて元のサイズに戻す
+    reconstructed_image = reconstructed_image[:h, :w]
+    return reconstructed_image
+
+
+# 学習済みモデルをロード
+model.load_state_dict(torch.load(model_path, map_location=device))
+
+# 推論対象のRAW画像をロード
+test_image = load_raw_image("hyouka/2400_1_SC.raw", 100, 460)  # 460x100の画像をロード
+
+# 推論と再結合
+predicted_image = split_and_merge_with_inference(test_image, model, device, grid_size=32)
+
+# 推論結果を保存
+output_path = "predicted_mask.png"
+result_image = Image.fromarray(predicted_image)
+result_image.save(output_path)
+print(f"推論結果を{output_path}に保存しました")
