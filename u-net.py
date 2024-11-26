@@ -50,7 +50,7 @@ class CrackDatasetRaw(Dataset):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        # RAW画像の読み込みと正規化
+        # RAW画像を読み込みと正規化
         img_path = os.path.join(self.image_dir, self.image_files[idx])
         with open(img_path, "rb") as f:
             raw_data = f.read()
@@ -58,13 +58,14 @@ class CrackDatasetRaw(Dataset):
             raw_image = (raw_image.astype("float32") - raw_image.min()) / (raw_image.max() - raw_image.min())
             raw_image = torch.from_numpy(raw_image).unsqueeze(0)  # [1, H, W]
 
-        # マスク画像の読み込みと変換
+        # マスク画像の読み込みと正規化
         mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
-        mask = Image.open(mask_path).convert("L")
-        mask = np.array(mask)
-        mask = torch.from_numpy(mask).unsqueeze(0).float()  # floatに変換
+        mask = Image.open(mask_path).convert("L")  # グレースケールで読み込み
+        mask = np.array(mask).astype("float32") / 255.0  # 0~1に正規化
+        mask = torch.from_numpy(mask).unsqueeze(0)  # [1, H, W]
 
         return raw_image, mask
+
 
 
 # モデルの作成
@@ -90,8 +91,13 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, inputs, targets):
         BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        print("BCE:",BCE_loss)
         pt = torch.exp(-BCE_loss)
+        eps = 1e-8
+        pt = torch.clamp(pt, eps, 1-eps)
+        print("pt:", pt)
         F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+        print("F_loss:",F_loss)
         return F_loss.mean() if self.reduction == 'mean' else F_loss.sum()
 
 criterion = FocalLoss()
@@ -116,7 +122,7 @@ train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
 eval_loader = DataLoader(eval_dataset, batch_size=10, shuffle=False)
 
 # 学習設定
-num_epochs = 3
+num_epochs = 1
 
 # 保存ディレクトリとファイル名設定
 date_str = datetime.now().strftime('%Y-%m-%d')
@@ -140,8 +146,8 @@ for epoch in range(num_epochs):
 
     # トレーニング
     for images, masks in train_loader:
-        print(f"Image Min: {images.min()}, Max: {images.max()}")
-        print(f"Mask Min: {masks.min()}, Max: {masks.max()}")
+        # print(f"Image Min: {images.min()}, Max: {images.max()}")
+        # print(f"Mask Min: {masks.min()}, Max: {masks.max()}")
         images = images.to(device)
         masks = masks.to(device).float()  # 明示的にfloatに変換
 
