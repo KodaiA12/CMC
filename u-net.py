@@ -91,13 +91,10 @@ class FocalLoss(torch.nn.Module):
 
     def forward(self, inputs, targets):
         BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
-        print("BCE:",BCE_loss)
         pt = torch.exp(-BCE_loss)
         eps = 1e-8
         pt = torch.clamp(pt, eps, 1-eps)
-        print("pt:", pt)
         F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
-        print("F_loss:",F_loss)
         return F_loss.mean() if self.reduction == 'mean' else F_loss.sum()
 
 criterion = FocalLoss()
@@ -122,7 +119,7 @@ train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
 eval_loader = DataLoader(eval_dataset, batch_size=10, shuffle=False)
 
 # 学習設定
-num_epochs = 1
+num_epochs = 100
 
 # 保存ディレクトリとファイル名設定
 date_str = datetime.now().strftime('%Y-%m-%d')
@@ -226,7 +223,7 @@ plt.legend()
 graph_path = os.path.join(save_dir, f"training_graph_{date_str}.png")
 plt.tight_layout()
 plt.savefig(graph_path)
-plt.show()
+
 
 print(f"グラフを '{graph_path}' に保存しました")
 
@@ -292,17 +289,17 @@ def split_and_merge_with_inference(image, model, device, grid_size=32):
     return reconstructed_image
 
 
-# 学習済みモデルをロード
-model.load_state_dict(torch.load(model_path, map_location=device))
+# # 学習済みモデルをロード
+# model.load_state_dict(torch.load(model_path, map_location=device))
 
-# 推論対象のRAW画像をロード
-test_image = load_raw_image("hyouka/2400_1_SC.raw", 100, 460)  # 460x100の画像をロード
+# # 推論対象のRAW画像をロード
+# test_image = load_raw_image("hyouka/2400_1_SC.raw", 100, 460)  # 460x100の画像をロード
 
-# 推論と再結合
-predicted_image = split_and_merge_with_inference(test_image, model, device, grid_size=32)
+# # 推論と再結合
+# predicted_image = split_and_merge_with_inference(test_image, model, device, grid_size=32)
 
-# 推論結果を保存
-output_path = "predicted_mask.png"
-result_image = Image.fromarray(predicted_image)
-result_image.save(output_path)
-print(f"推論結果を{output_path}に保存しました")
+# # 推論結果を保存
+# output_path = "predicted_mask.png"
+# result_image = Image.fromarray(predicted_image)
+# result_image.save(output_path)
+# print(f"推論結果を{output_path}に保存しました")

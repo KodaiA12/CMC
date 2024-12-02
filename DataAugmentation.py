@@ -96,7 +96,7 @@ def augment_train_and_validation(base_dir, n, h, w):
 
 # 実行
 base_dir = "data/first"  # ベースディレクトリ
-n = 5  # 各画像ごとに生成する加工画像の枚数
+n = 10  # 各画像ごとに生成する加工画像の枚数
 h, w = 32, 32  # 元画像およびラベルの高さと幅
 
 augment_train_and_validation(base_dir, n, h, w)
