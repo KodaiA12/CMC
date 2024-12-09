@@ -147,7 +147,7 @@ def cropped_area_size(input_dir, input_GT_dir, save_path, grid_size):
             continue
 
         # ラベル画像を読み込む
-        gt_path = os.path.join(input_GT_dir, f"{name}_SC.png")  # ファイル名から構築
+        gt_path = os.path.join(input_GT_dir, f"{name}_gt.png")  # ファイル名から構築
         gt = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
         img_name = os.path.basename(name)
 
@@ -206,8 +206,8 @@ def cropped_area_size(input_dir, input_GT_dir, save_path, grid_size):
 
 # 使用例
 cropped_area_size(
-    input_dir="data/second/first_data",       # 元画像のディレクトリ
-    input_GT_dir="data/second/first_label",   # ラベル画像のディレクトリ
+    input_dir="data/second/second_data",       # 元画像のディレクトリ
+    input_GT_dir="data/second/second_label",   # ラベル画像のディレクトリ
     save_path="data/second",                  # 保存先のベースディレクトリ
     grid_size=32                             # クロップサイズ
 )
