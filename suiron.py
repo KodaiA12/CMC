@@ -108,7 +108,7 @@ def calculate_crack_accuracy(predicted_image, label_image):
 
 
 # モデルとデバイスの設定
-model_path = "results_2024-11-29/crack_detection_model.pth"  # 学習済みモデルのパス
+model_path = "results_2024-12-10/crack_detection_model.pth"  # 学習済みモデルのパス
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # モデルの定義（Unet++を使用している例）
@@ -124,10 +124,10 @@ model.load_state_dict(torch.load(model_path, map_location=device))
 model = model.to(device)
 
 # 推論対象のRAW画像とラベル画像の読み込み
-raw_image_path = "hyouka/2400_SC.raw"  # 推論対象のRAW画像
-label_image_path = "2400.png"  # ラベル画像（PNG形式）
+raw_image_path = "hyouka/2400_1_SC.raw"  # 推論対象のRAW画像
+label_image_path = "hyouka/2400_gt.png"  # ラベル画像（PNG形式）
 
-raw_image = load_raw_image(raw_image_path, h=100, w=460)  # RAW画像サイズを指定
+raw_image = load_raw_image(raw_image_path, h=175, w=638)  # RAW画像サイズを指定
 label_image = np.array(Image.open(label_image_path).convert("L"))  # グレースケール画像
 
 # 推論と正解率の計算
