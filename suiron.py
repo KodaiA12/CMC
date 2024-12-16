@@ -58,13 +58,14 @@ def split_and_merge_with_inference(image, model, device, grid_size=32):
 
 import cv2
 
-def evaluate_predictions(result_file_path, gt_file_path):
+def evaluate_predictions(result_file_path, gt_file_path, save_path):
     """
-    推論結果とラベルデータの比較（TP, TN, FP, FN）から精度を計算する関数。
+    推論結果とラベルデータの比較（TP, TN, FP, FN）から精度を計算し、結果を保存する関数。
     
     Parameters:
     - result_file_path (str): 推論結果の画像ファイルパス（PNG形式）
     - gt_file_path (str): 正解ラベル画像のファイルパス（PNG形式）
+    - save_path (str): 評価結果を保存するテキストファイルのパス
     """
     # 画像の読み込み
     img = cv2.imread(result_file_path, cv2.IMREAD_GRAYSCALE)
@@ -97,11 +98,23 @@ def evaluate_predictions(result_file_path, gt_file_path):
     precision = TP / (TP + FP) if (TP + FP) != 0 else 0
     f_measure = (2 * recall * precision) / (recall + precision) if (recall + precision) != 0 else 0
 
-    # 結果の表示
-    print(f"推論結果画像: {result_file_path}")
-    print(f"正解ラベル画像: {gt_file_path}")
-    print(f"TP: {TP}, TN: {TN}, FP: {FP}, FN: {FN}")
-    print(f"精度: {accuracy:.4f}, 再現率: {recall:.4f}, 適合率: {precision:.4f}, F値: {f_measure:.4f}\n")
+    # 結果を文字列に整形
+    result_text = (
+        f"推論結果画像: {result_file_path}\n"
+        f"正解ラベル画像: {gt_file_path}\n"
+        f"TP: {TP}, TN: {TN}, FP: {FP}, FN: {FN}\n"
+        f"精度: {accuracy:.4f}, 再現率: {recall:.4f}, 適合率: {precision:.4f}, F値: {f_measure:.4f}\n"
+    )
+
+    # 結果を出力
+    print(result_text)
+
+    # 結果をファイルに保存
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)  # ディレクトリが存在しない場合は作成
+    with open(save_path, 'w') as f:
+        f.write(result_text)
+
+    print(f"評価結果を {save_path} に保存しました。")
 
 
 
@@ -132,5 +145,5 @@ Image.fromarray(predicted_image).save(output_path)
 print(f"推論結果を {output_path} に保存しました")
 
 # 精度評価
-evaluate_predictions(output_path, label_image_path)
+evaluate_predictions(output_path, label_image_path, "results_2024-12-10/evaluation_results.txt")
 
