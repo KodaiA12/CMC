@@ -6,6 +6,7 @@ import glob
 import re
 import cv2
 import segmentation_models_pytorch as smp
+from scipy.ndimage import rotate  # 回転用の関数
 
 
 def load_raw_image(file_path, h, w):
@@ -116,8 +117,70 @@ def evaluate_predictions(result_file_path, gt_file_path, save_path):
 
     print(f"評価結果を {save_path} に保存しました。")
 
+def rotate_raw(file_path, save_dir, w, h, deg=15):
+    # データの読み込み
+    with open(file_path, "rb") as f:
+        name = os.path.basename(file_path)
+        rawdata = f.read()
+        data = np.frombuffer(rawdata, dtype=np.int16).reshape(h, w)
 
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
+    with open(os.path.join(save_dir, name), "wb") as f:
+        mat = cv2.getRotationMatrix2D((w / 2, h / 2), deg, 1.0)
+        rotated_data = cv2.warpAffine(data, mat, (w, h), flags=cv2.INTER_NEAREST)
+        f.write(rotated_data.tobytes())
+
+from PIL import Image
+import os
+
+def rotate_image(file_path, save_dir, degree):
+    """
+    画像を回転し、元のサイズを保ちながら、はみ出た部分を無視して保存します。
+    
+    Args:
+        file_path (str): 入力画像のファイルパス。
+        save_dir (str): 保存先ディレクトリのパス。
+        degree (float): 回転角度（時計回り）。
+    
+    Returns:
+        str: 保存された画像のパス。
+    """
+    try:
+        # 入力画像を開く
+        with Image.open(file_path) as img:
+            original_size = img.size  # 元画像のサイズを取得
+            
+            # 回転処理を実行（画像全体を回転）
+            rotated_img = img.rotate(degree, expand=True)
+            
+            # 中央から元のサイズでクロップ
+            rotated_width, rotated_height = rotated_img.size
+            left = (rotated_width - original_size[0]) / 2
+            top = (rotated_height - original_size[1]) / 2
+            right = left + original_size[0]
+            bottom = top + original_size[1]
+            cropped_img = rotated_img.crop((left, top, right, bottom))
+            
+            # 保存先ディレクトリが存在しない場合は作成
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            
+            # 保存ファイル名の生成
+            file_name = os.path.basename(file_path)
+            save_path = os.path.join(save_dir, file_name)
+            
+            # クロップ後の画像を保存
+            cropped_img.save(save_path, "PNG")
+            
+            print(f"画像が保存されました: {save_path}")
+            return save_path
+    except Exception as e:
+        print(f"エラーが発生しました: {e}")
+        return None
+
+    
 # モデルとデバイスの設定
 model_path = "results_2024-12-10/crack_detection_model.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

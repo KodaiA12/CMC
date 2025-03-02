@@ -107,7 +107,7 @@ import shutil
 import cv2
 
 # RAW画像を読み込む関数
-def load_raw_image(file_path, h=130, w=574):
+def load_raw_image(file_path, h=175, w=638):
     try:
         with open(file_path, "rb") as f:
             rawdata = f.read()
@@ -206,8 +206,8 @@ def cropped_area_size(input_dir, input_GT_dir, save_path, grid_size):
 
 # 使用例
 cropped_area_size(
-    input_dir="data/second/second_data",       # 元画像のディレクトリ
-    input_GT_dir="data/second/second_label",   # ラベル画像のディレクトリ
-    save_path="data/second",                  # 保存先のベースディレクトリ
+    input_dir="data/third/third_data",       # 元画像のディレクトリ
+    input_GT_dir="data/third/third_label",   # ラベル画像のディレクトリ
+    save_path="data/third",                  # 保存先のベースディレクトリ
     grid_size=32                             # クロップサイズ
 )

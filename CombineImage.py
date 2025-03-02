@@ -1,6 +1,6 @@
 import numpy as np
 from PIL import Image
-
+"~~~評価用~~~"
 
 def create_difference_image(predicted_image, label_image):
     """
