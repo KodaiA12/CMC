@@ -182,7 +182,7 @@ def rotate_image(file_path, save_dir, degree):
 
     
 # モデルとデバイスの設定
-model_path = "results_2024-12-10/crack_detection_model.pth"
+model_path = "results_2025-03-12/crack_detection_model.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = smp.UnetPlusPlus(
@@ -196,10 +196,10 @@ model.load_state_dict(torch.load(model_path, map_location=device))
 model = model.to(device)
 
 # 推論処理
-raw_image_path = "hyouka/2400_1_SC.raw"
-label_image_path = "hyouka/2400_gt.png"
+raw_image_path = "hyouka/2400_SC.raw"
+label_image_path = "hyouka/2400_gt2.png"
 
-raw_image = load_raw_image(raw_image_path, h=175, w=638)
+raw_image = load_raw_image(raw_image_path, h=168, w=635)
 predicted_image = split_and_merge_with_inference(raw_image, model, device, grid_size=32)
 
 # 推論結果の保存
@@ -208,5 +208,5 @@ Image.fromarray(predicted_image).save(output_path)
 print(f"推論結果を {output_path} に保存しました")
 
 # 精度評価
-evaluate_predictions(output_path, label_image_path, "results_2024-12-10/evaluation_results.txt")
+evaluate_predictions(output_path, label_image_path, "results_2025-03-12/evaluation_results.txt")
 

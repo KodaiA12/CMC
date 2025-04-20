@@ -74,8 +74,8 @@ def augment_images_and_labels(image_dir, label_dir, n, output_image_dir, output_
             augmented_img, augmented_label = random_augmentation(img.copy(), label.copy(), h, w)
 
             # 加工後の画像とラベルの名前を生成
-            img_output_name = f"{i+1}_{img_name}_augmented.raw"
-            label_output_name = f"{i+1}_{label_name}_augmented.png"
+            img_output_name = f"4ex_{i+1}_{img_name}_augmented.raw"
+            label_output_name = f"4ex_{i+1}_{label_name}_augmented.png"
 
             # 加工後の画像とラベルを保存
             img_output_path = os.path.join(output_image_dir, img_output_name)

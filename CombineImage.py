@@ -36,7 +36,7 @@ def create_difference_image(predicted_image, label_image):
 
 
 # 正解画像と推論画像を読み込む
-label_image_path = "hyouka/2400_gt.png"       # ラベル画像のパス
+label_image_path = "hyouka/2400_gt2.png"       # ラベル画像のパス
 predicted_image_path = "predicted_mask.png"        # 推論結果画像のパス
 
 label_image = np.array(Image.open(label_image_path).convert("L"))       # ラベル画像をグレースケールで読み込み
