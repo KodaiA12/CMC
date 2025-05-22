@@ -206,8 +206,10 @@ def cropped_area_size(input_dir, input_GT_dir, save_path, grid_size):
 
 # 使用例
 cropped_area_size(
-    input_dir="data/third/third_data",       # 元画像のディレクトリ
-    input_GT_dir="data/third/third_label",   # ラベル画像のディレクトリ
-    save_path="data/third",                  # 保存先のベースディレクトリ
+    input_dir="Normalized/4ex",       # 元画像のディレクトリ
+    input_GT_dir="data/4ex/label",   # ラベル画像のディレクトリ
+    # input_dir="data\second\second_data",
+    # input_GT_dir="data\second\second_label",
+    save_path="data/set/4ex",                  # 保存先のベースディレクトリ
     grid_size=32                             # クロップサイズ
 )

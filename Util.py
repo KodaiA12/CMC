@@ -200,13 +200,44 @@ def multi_raw2png(file_dir, save_dir, w, h):
         norm_data = normalize(data)
         cv2.imwrite(os.path.join(save_dir, name + ".png"), norm_data)
 
+def load_raw_image(file_path, h, w):
+    with open(file_path, "rb") as f:
+        rawdata = f.read()
+        data = np.frombuffer(rawdata, dtype=np.int16).reshape(h, w)
+    return data
+
+def normalize_background(input_folder,output_folder, h, w):
+    """
+    フォルダ内のすべてのRAW画像の背景輝度を正規化し、"output"フォルダに保存する関数。
+    """
+    os.makedirs(output_folder, exist_ok=True)
+
+    for filename in os.listdir(input_folder):
+        if filename.endswith(".raw"):
+            input_path = os.path.join(input_folder, filename)
+            output_path = os.path.join(output_folder, filename)
+
+            image = load_raw_image(input_path, h, w)
+
+            top_rows = image[:5, :]
+            bottom_rows = image[-5:, :]
+            top_mean = np.mean(top_rows)
+            bottom_mean = np.mean(bottom_rows)
+            background_mean = (top_mean + bottom_mean) / 2
+
+            normalized_image = image - background_mean
+            normalized_image = np.maximum(normalized_image, 0)
+
+            with open(output_path, "wb") as f:
+                f.write(normalized_image.astype(np.int16).tobytes())
 
 if __name__ == "__main__":
     # 1ex
     # multi_crop_raw("test/data/first/first_data", "test/data/first/1ex_cropped", t_left=(400, 550), b_right=(860, 650))
     #multi_crop_raw("dataset/test", "dataset/test2", t_left=(400, 550), b_right=(860, 650))
     # multi_raw2png("1ex_cropped", "1ex_png", 574, 130)
-    raw2png("data/second/second_data/2800_SC.raw", "pngfolder", 574, 130)
+    # raw2png("data/second/second_data/2800_SC.raw", "pngfolder", 574, 130)
+    normalize_background("data/5ex","Normalized/5ex", 168, 635)
 
     # 3ex
     # multi_rotate_raw("data/3_ex", "3ex")

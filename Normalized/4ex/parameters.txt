@@ -1,0 +1,10 @@
+raw image size
+self.w = 638
+self.h = 175
+
+crop cordinates
+(352,504) ⇒ (990,679)
+
+raw image range
+self.min = 207
+self.max = 801
